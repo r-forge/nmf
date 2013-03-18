@@ -1,10 +1,11 @@
 \name{nmf_update.euclidean_offset.h}
+\alias{nmfAlgorithm.offset}
+\alias{nmfAlgorithm.offset_R}
 \alias{nmf_update.euclidean_offset.h}
 \alias{nmf_update.euclidean_offset.w}
 \alias{nmf_update.offset}
 \alias{nmf_update.offset_R}
-\alias{offset-nmf}
-\alias{Roffset-nmf}
+\alias{offset_R-nmf}
 \title{NMF Multiplicative Update for NMF with Offset Models}
 \usage{
   nmf_update.euclidean_offset.h(v, w, h, offset,
@@ -17,6 +18,13 @@
 
   nmf_update.offset(i, v, x, copy = FALSE, eps = 10^-9,
     ...)
+
+  nmfAlgorithm.offset_R(..., .stop = NULL, maxIter = 2000,
+    eps = 10^-9, stopconv = 40, check.interval = 10)
+
+  nmfAlgorithm.offset(..., .stop = NULL, maxIter = 2000,
+    copy = FALSE, eps = 10^-9, stopconv = 40,
+    check.interval = 10)
 }
 \arguments{
   \item{offset}{current value of the offset/intercept
@@ -45,7 +53,35 @@
   \item{...}{extra arguments. These are generally not used
   and present only to allow other arguments from the main
   call to be passed to the initialisation and stopping
-  criterion functions.}
+  criterion functions (slots \code{onInit} and \code{Stop}
+  respectively).}
+
+  \item{.stop}{specification of a stopping criterion, that
+  is used instead of the one associated to the NMF
+  algorithm. It may be specified as: \itemize{ \item the
+  access key of a registered stopping criterion; \item a
+  single integer that specifies the exact number of
+  iterations to perform, which will be honoured unless a
+  lower value is explicitly passed in argument
+  \code{maxIter}. \item a single numeric value that
+  specifies the stationnarity threshold for the objective
+  function, used in with \code{\link{nmf.stop.stationary}};
+  \item a function with signature
+  \code{(object="NMFStrategy", i="integer", y="matrix",
+  x="NMF", ...)}, where \code{object} is the
+  \code{NMFStrategy} object that describes the algorithm
+  being run, \code{i} is the current iteration, \code{y} is
+  the target matrix and \code{x} is the current value of
+  the NMF model. }}
+
+  \item{maxIter}{maximum number of iterations to perform.}
+
+  \item{stopconv}{number of iterations intervals over which
+  the connectivity matrix must not change for stationarity
+  to be achieved.}
+
+  \item{check.interval}{interval (in number of iterations)
+  on which the stopping criterion is computed.}
 
   \item{w}{current basis matrix}
 
