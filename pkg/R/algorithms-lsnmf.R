@@ -30,8 +30,7 @@ NULL
 #' @param ... extra arguments (not used)
 #'  
 #' @return updated object \code{object}
-#' @aliases lsnmf-nmf
-#' @rdname lsnmf
+#' @rdname lsNMF-nmf
 nmf_update.lsnmf <- function(i, X, object, weight, eps=10^-9, ...)
 {
 	if( i == 1 ){# pre-compute weighted target matrix
@@ -65,13 +64,18 @@ nmf_update.lsnmf <- function(i, X, object, weight, eps=10^-9, ...)
 
 #' \code{wrss} implements the objective function used by the LS-NMF algorithm.
 #' 
-#' @rdname lsnmf 
+#' @rdname lsNMF-nmf
 wrss <- function(object, X, weight){
 	sum( ((X - fitted(object)) * weight)^2 )/2
 }
 
 # Registration of LS-NMF
-setNMFMethod('ls-nmf', objective=wrss
+#' @inheritParams run,NMFStrategyIterative,matrix,NMFfit-method
+#' @inheritParams nmf.stop.stationary
+#' 
+#' @aliases lsNMF-nmf
+#' @rdname lsNMF-nmf
+nmfAlgorithm.lsNMF <- setNMFMethod('ls-nmf', objective=wrss
 			, Update=nmf_update.lsnmf
 			, Stop='stationary')
 	

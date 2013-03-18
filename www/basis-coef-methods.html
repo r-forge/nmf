@@ -2,15 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-<title>basis. NMF 0.13</title>
+<title>basis. NMF 0.15</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="author" content="">
 
+<!-- bootstrap css -->
 <link href="css/bootstrap.css" rel="stylesheet">
 <link href="css/bootstrap-responsive.css" rel="stylesheet">
+<!-- highlighting css -->
 <link href="css/highlight.css" rel="stylesheet">
+<!-- custom css -->
 <link href="css/staticdocs.css" rel="stylesheet">
 
+<!-- bootstrap javascript -->
+<script src="js/jquery.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
 <!-- d3 word cloud -->
 <script src="js/d3.v2.min.js"></script>
 <script src="js/d3.layout.cloud.js"></script>
@@ -24,7 +30,7 @@
     <div class="navbar">
   <div class="navbar-inner">
     <div class = "container">
-      <a class="brand" href="index.html">NMF 0.13</a>
+      <a class="brand" href="index.html">NMF 0.15</a>
       <div class="nav">
         <ul class="nav">
         <li><a href="_MAN.html"><i class="icon-home icon-white"></i> Index</a></li>
@@ -325,36 +331,36 @@ scoef(object, ...)
     <pre class="examples"><div class='input'># Scaled coefficient matrix</div><div class='input'>x <- rnmf(3, 10, 5)
 </div><div class='input'>scoef(x)
 </div>
-<div class='output'>           [,1]      [,2]       [,3]      [,4]      [,5]
-[1,] 0.19680851 0.1756612 0.41189375 0.2835836 0.1220272
-[2,] 0.08069534 0.3658929 0.56482300 0.3536590 0.4646175
-[3,] 0.72249615 0.4584459 0.02328325 0.3627574 0.4133554
+<div class='output'>            [,1]       [,2]      [,3]       [,4]      [,5]
+[1,] 0.003084372 0.35243207 0.2845238 0.40288175 0.1407793
+[2,] 0.351959882 0.09151328 0.3608930 0.04698138 0.5360637
+[3,] 0.644955746 0.55605465 0.3545832 0.55013687 0.3231570
 </div><div class='input'>scoef(x, 100)
 </div>
-<div class='output'>          [,1]     [,2]      [,3]     [,4]     [,5]
-[1,] 19.680851 17.56612 41.189375 28.35836 12.20272
-[2,]  8.069534 36.58929 56.482300 35.36590 46.46175
-[3,] 72.249615 45.84459  2.328325 36.27574 41.33554
+<div class='output'>           [,1]      [,2]     [,3]      [,4]     [,5]
+[1,]  0.3084372 35.243207 28.45238 40.288175 14.07793
+[2,] 35.1959882  9.151328 36.08930  4.698138 53.60637
+[3,] 64.4955746 55.605465 35.45832 55.013687 32.31570
 </div><div class='input'># random standard NMF model</div><div class='input'>x <- rnmf(3, 10, 5)
 </div><div class='input'>basis(x)
 </div>
-<div class='output'>           [,1]      [,2]       [,3]
- [1,] 0.9009685 0.4069052 0.04928522
- [2,] 0.1832506 0.9955212 0.25090413
- [3,] 0.3686079 0.4377077 0.21452244
- [4,] 0.6472006 0.1119138 0.07348901
- [5,] 0.4350498 0.8732905 0.26108987
- [6,] 0.9914650 0.8577419 0.16141179
- [7,] 0.3181644 0.7906222 0.47367262
- [8,] 0.8611652 0.7165222 0.19597435
- [9,] 0.2127737 0.5865166 0.27748761
-[10,] 0.2542665 0.6661276 0.31815235
+<div class='output'>            [,1]        [,2]       [,3]
+ [1,] 0.27886166 0.329587083 0.17742241
+ [2,] 0.13750211 0.003408532 0.07467189
+ [3,] 0.03719745 0.366550114 0.21764949
+ [4,] 0.30203942 0.525620662 0.06642981
+ [5,] 0.78117717 0.404605591 0.12878768
+ [6,] 0.79882103 0.157284424 0.88034450
+ [7,] 0.88272144 0.104759723 0.57405458
+ [8,] 0.27041705 0.065655318 0.88713448
+ [9,] 0.63094898 0.632971693 0.29307884
+[10,] 0.21197194 0.839404206 0.68330945
 </div><div class='input'>coef(x)
 </div>
-<div class='output'>          [,1]      [,2]      [,3]       [,4]       [,5]
-[1,] 0.8719832 0.8715992 0.3647896 0.01516415 0.02276061
-[2,] 0.1498938 0.5017297 0.1348445 0.86331407 0.53262062
-[3,] 0.3911880 0.2939961 0.3047281 0.30189046 0.54807665
+<div class='output'>          [,1]       [,2]      [,3]      [,4]       [,5]
+[1,] 0.7036362 0.72913328 0.4418194 0.2163564 0.05778929
+[2,] 0.6680319 0.09961785 0.4527574 0.1991783 0.07926611
+[3,] 0.1543425 0.15474178 0.5024723 0.9255158 0.21452671
 </div><div class='input'></div><div class='input'># set matrix factors</div><div class='input'>basis(x) <- matrix(1, nrow(x), nbasis(x))
 </div><div class='input'>coef(x) <- matrix(1, nbasis(x), ncol(x))
 </div><div class='input'># set random factors</div><div class='input'>basis(x) <- rmatrix(basis(x))

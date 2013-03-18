@@ -137,7 +137,10 @@ setClass('NMFStrategyIterativeX'
 
 
 ###% Creates a NMFStrategyIterativeX object from a NMFStrategyIterative object.
-xifyStrategy <- function(strategy, workspace){	
+xifyStrategy <- function(strategy, workspace=new.env(emptyenv())){	
+	
+	# do nothing if already executable
+	if( is(strategy, 'NMFStrategyIterativeX') ) return(strategy)
 	
 	# first check the strategy's validity
 	if( is.character(err <- validObject(strategy, test=TRUE)) ){
@@ -317,20 +320,21 @@ setMethod('run', signature(object='NMFStrategyIterativeX', y='matrix', x='NMFfit
 	
 	#Vc# initialize the strategy
 	# check validity of arguments if possible
-	update.args <- formals(strategy@Update)
-	stop.args <- formals(strategy@Stop)
-	internal.args <- names(c(update.args[1:3], stop.args[1:4]))
-	expected.args <- c(update.args[-(1:3)], stop.args[-(1:4)])
+	method.args <- nmfFormals(strategy, runtime=TRUE)
+	internal.args <- method.args$internals
+	expected.args <- method.args$defaults
 	passed.args <- names(list(...))
 	forbidden.args <- is.element(passed.args, c(internal.args))
-	if( any(forbidden.args) )
+	if( any(forbidden.args) ){
 		stop("NMF::run - Update/Stop method : formal argument(s) "
 			, paste( paste("'", passed.args[forbidden.args],"'", sep=''), collapse=', ')
 			, " already set internally.", call.=FALSE)
+	}
 	# !is.element('...', expected.args) && 
-	if( any(t <- !pmatch(passed.args, names(expected.args), nomatch=FALSE)) )
-		stop("NMF::run - Update/Stop method for algorithm '", name(strategy),"': unused argument(s) "
+	if( any(t <- !pmatch(passed.args, names(expected.args), nomatch=FALSE)) ){
+		stop("NMF::run - onInit/Update/Stop method for algorithm '", name(strategy),"': unused argument(s) "
 			, paste( paste("'", passed.args[t],"'", sep=''), collapse=', '), call.=FALSE)
+	}
 	# check for required arguments
 	required.args <- sapply(expected.args, function(x){ x <- as.character(x); length(x) == 1 && nchar(x) == 0 } )
 	required.args <- names(expected.args[required.args])
@@ -370,7 +374,12 @@ setMethod('run', signature(object='NMFStrategyIterativeX', y='matrix', x='NMFfit
 	
 	showNIter.step <- 50L
 	showNIter <- verbose && maxIter >= showNIter.step
-	if( showNIter ) cat('Iterations:')
+	if( showNIter ){
+		ndIter <- nchar(as.character(maxIter))
+		itMsg <- paste0('Iterations: %', ndIter, 'i', "/", maxIter)
+		cat(itMsgBck <- sprintf(itMsg, 0))
+		itMsgBck <- nchar(itMsgBck)
+	}
 	i <- 0L
 	while( TRUE ){
 		
@@ -384,7 +393,9 @@ setMethod('run', signature(object='NMFStrategyIterativeX', y='matrix', x='NMFfit
 		# increment i
 		i <- i+1L
 		
-		if( showNIter && (i==1L || i %% showNIter.step == 0L) ) cat('', i)
+		if( showNIter && (i==1L || i %% showNIter.step == 0L) ){
+			cat(paste0(rep("\r", itMsgBck), sprintf(itMsg, i)))
+		}
 		
 		#Vc# update the matrices
 		nmfFit <- updateFun(i, v, nmfFit, ...)
@@ -415,6 +426,35 @@ setMethod('run', signature(object='NMFStrategyIterativeX', y='matrix', x='NMFfit
 	nmf.debug('NMFStrategyIterativeX::run', 'Done')
 	invisible(nmfData)
 })
+
+
+#' @S3method nmfFormals NMFStrategyIterative
+nmfFormals.NMFStrategyIterative <- function(x, runtime=FALSE, ...){
+	
+	strategy <- xifyStrategy(x)
+	# from run method
+	m <- getMethod('run', signature(object='NMFStrategyIterative', y='matrix', x='NMFfit'))
+	run.args <- allFormals(m)[-(1:3)]
+	# onInit
+	init.args <- if( is.function(strategy@onInit) ) formals(strategy@onInit)
+	# Update
+	update.args <- formals(strategy@Update)
+	# Stop
+	stop.args <- formals(strategy@Stop)
+	# spplit internals and 
+	internal.args <- names(c(init.args[1:3], update.args[1:3], stop.args[1:4]))
+	expected.args <- c(init.args[-(1:3)], update.args[-(1:3)], stop.args[-(1:4)])
+	
+	if( runtime ){
+		# prepend registered default arguments
+		expected.args <- expand_list(strategy@defaults, expected.args)
+		list(internal=internal.args, defaults=expected.args)
+	}else{
+		args <- c(run.args, expected.args)
+		# prepend registered default arguments
+		expand_list(strategy@defaults, args)
+	}
+}
 
 ################################################################################################
 # INITIALIZATION METHODS
@@ -771,8 +811,8 @@ nmf.stop.threshold <- function(threshold){
 #' @param x the current NMF model 
 #' @param stationary.th maximum absolute value of the gradient, for the objective 
 #' function to be considered stationary.
-#' @param check.interval interval (in number of iterations) on which stationarity 
-#' is computed. 
+#' @param check.interval interval (in number of iterations) on which the stopping  
+#' criterion is computed. 
 #' @param check.niter number of successive iteration used to compute the stationnary 
 #' criterion.
 #' @param ... extra arguments passed to the function \code{\link{objective}}, 
@@ -853,6 +893,7 @@ nmf.stop.stationary <- local({
 #' \code{nmf.stop.connectivity} implements the stopping criterion that is based 
 #' on the stationarity of the connectivity matrix.
 #' 
+#' @inheritParams nmf.stop.stationary
 #' @param stopconv number of iterations intervals over which the connectivity 
 #' matrix must not change for stationarity to be achieved.
 #'   

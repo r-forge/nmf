@@ -375,3 +375,44 @@ setMethod('modelname', signature(object='NMFStrategy'),
 is.mixed <-	function(object){
 	return( slot(object, 'mixed') )
 }
+
+#' Showing Arguments of NMF Algorithms
+#' 
+#' This function returns the extra arguments that can be passed
+#' to a given NMF algorithm in call to \code{\link{nmf}}.
+#' 
+#' @param x algorithm specification
+#' @param ... extra argument to allow extension
+#' 
+#' @export
+nmfFormals <- function(x, ...){
+	UseMethod('nmfFormals')
+}
+
+#' @S3method nmfFormals character
+nmfFormals.character <- function(x, ...){
+	s <- nmfAlgorithm(x)
+	nmfFormals(s, ...)
+}
+
+#' @S3method nmfFormals NMFStrategy
+nmfFormals.NMFStrategy <- function(x, ...){
+	m <- getMethod('run', signature(object='NMFStrategy', y='matrix', x='NMFfit'))
+	args <- allFormals(m)
+	# prepend registered default arguments
+	expand_list(x@defaults, args)
+}
+
+#' \code{nmfArgs} is a shortcut for \code{args(nmfWrapper(x))}, to 
+#' display the arguments of a given NMF algorithm.
+#' 
+#' @rdname nmfFormals
+#' @export
+#' @examples 
+#' 
+#' # show arguments of an NMF algorithm
+#' nmfArgs('brunet')
+#' nmfArgs('snmf/r')
+nmfArgs <- function(x){
+	args(nmfWrapper(x))
+}
