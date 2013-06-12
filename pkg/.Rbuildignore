@@ -5,8 +5,9 @@
 vignettes/tmplib$
 vignettes/figure$
 vignettes/cache$
-vignettes/Rpackages\.bib
 vignettes/.*\.tex
+vignettes/Rplots.pdf$
+.*\.mk
 ^makefile$
 tests-results$
 ^.*\.Rproj$

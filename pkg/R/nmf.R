@@ -1466,6 +1466,15 @@ function(x, rank, method
 				## 2. RUN
 				# ensure that the package NMF is in each worker's search path
 				.packages <- setupLibPaths('NMF', verbose>3)
+                
+                # export all packages that contribute to NMF registries, 
+                # e.g., algorithms or seeding methods.
+                # This is important so that these can be found in worker nodes
+                # for non-fork clusters.
+                if( !is.null(contribs <- registryContributors(package = 'NMF')) ){
+                    .packages <- c(pkg, contribs)
+                }
+                
 				# export dev environment if in dev mode 
 #				.export <- if( isDevNamespace('NMF') && !is.doSEQ() ) ls(asNamespace('NMF'))
 				
@@ -1619,6 +1628,7 @@ function(x, rank, method
 					res
 				}				
 				## END_FOREACH_LOOP
+				
 				if( verbose && !debug ){
 					if( verbose >= 2 ) cat(" ... DONE\n")
 					else{
@@ -1788,7 +1798,7 @@ function(x, rank, method
 						else if( verbose )
 							cat('%')
 						
-						gc(verbose= .MODE_SEQ && verbose > 3)
+						gc(verbose = verbose > 3)
 					}
 					
 					if( verbose > 1 ) cat("## DONE\n")
@@ -1902,7 +1912,7 @@ function(x, rank, method
 			seed <- fit(seed)
 		
 		# Wrap up the seed into a NMFfit object
-		seed <- NMFfit(fit=seed, seed='none')
+		seed <- NMFfit(fit=seed, seed='NMF')
 	}
 	else if( !inherits(seed, 'NMFfit') ){
 		
