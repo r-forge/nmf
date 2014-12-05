@@ -9,6 +9,8 @@ library(gridBase)
 # extends gpar objects
 c_gpar <- function(gp, ...){
     x <- list(...)
+    if( length(x) == 1L && is.null(names(x)) && is.list(x[[1]]) ) 
+        x <- x[[1]]
     do.call(gpar, c(gp, x[!names(x) %in% names(gp)]))
 }
 
@@ -29,9 +31,11 @@ lo <- function (rown, coln, nrow, ncol, cellheight, cellwidth
 	coln_height <- unit(0, "bigpts")
 	if(!is.null(coln)){
 		longest_coln = which.max(nchar(coln))
-		coln_height <- unit(10, "bigpts") +  unit(1.1, "grobheight", textGrob(coln[longest_coln], rot = 90, gp = c_gpar(gp, fontsize = fontsize_col)))
+#		coln_height <- unit(10, "bigpts") +  unit(1.1, "grobheight", textGrob(coln[longest_coln], rot = 90, gp = c_gpar(gp, fontsize = fontsize_col)))
+#        coln_height <- convertHeight(unit(1, "grobheight", textGrob(coln[longest_coln], rot = 90, gp = c_gpar(gp, fontsize = fontsize_col))), 'bigpts')
+        coln_height <- unit(10, "bigpts") +  unit(1, "grobheight", textGrob(coln[longest_coln], rot = 90, gp = c_gpar(gp, fontsize = fontsize_col)))
 	}
-
+    
 	rown_width <- rown_width_min <- unit(10, "bigpts")
 	if(!is.null(rown)){
 		longest_rown = which.max(nchar(rown))
@@ -81,11 +85,11 @@ lo <- function (rown, coln, nrow, ncol, cellheight, cellwidth
 	}
 	
 	# Width of the annotation legend
-	annot_legend_width <- 
+    annot_legend_width <- 
 		if( annotation_legend && !is_NA(annotation_colors) ){ 
 			.annLegend.dim(annotation_colors, fontsize)
 		}else unit(0, "bigpts")
-
+    
 	# Tree height
 	treeheight_col = unit(treeheight_col, "bigpts") + unit(5, "bigpts")
 	treeheight_row = unit(treeheight_row, "bigpts") + unit(5, "bigpts") 
@@ -126,8 +130,8 @@ lo <- function (rown, coln, nrow, ncol, cellheight, cellwidth
 	else{
 		matheight = unit(cellheight * nrow, "bigpts")
 	}	
-		
-	# HACK: 
+	
+    # HACK: 
 	# - use 6 instead of 5 column for the row_annotation
 	# - take into account the associated legend's width
 	# Produce layout()
@@ -222,7 +226,7 @@ lo <- function (rown, coln, nrow, ncol, cellheight, cellwidth
 #	suppressWarnings( opar <- par(plt = gridPLT(), new = TRUE) )
 	( opar <- par(plt = gridPLT(), new = TRUE) )
 	on.exit(par(opar))
-	if( getOption('verbose') ) grid.rect(gp = gpar(col = "blue", lwd = 2))
+	trace_vp()
 	if( !is(hc, 'dendrogram') )
 		hc <- as.dendrogram(hc)
 	res <- plot(hc, horiz = horiz, xaxs="i", yaxs="i", axes=FALSE, leaflab="none", ...)
@@ -269,11 +273,44 @@ draw_matrix = function(matrix, border_color, txt = NULL, gp = gpar()){
 	x = (1:m)/m - 1/2/m
 	y = (1:n)/n - 1/2/n
     
+    # extract graphical parameters
+    color_matrix <- attr(matrix, 'color')
+    type <- attr(matrix, 'type')
+    color_scale <- attr(matrix, 'scale')
+    
+    # define set of drawing functions
+    # rectangles
+    draw_cell.rect <- function(i, gp){
+        grid.rect(x = x[i], y = y, width = 1/m, height = 1/n, gp = gp)
+    }
+    # rounded rectangles
+    draw_cell.roundrect <- function(i, gp){
+        r <- .8 * (1 - radius[sign(matrix[,i]) + 2] * abs(matrix[,i]) / radius_base)
+        lapply(seq_along(y), function(j){
+            gp$fill <- color_matrix[j, i]
+            grid.roundrect(x = x[i], y = y[j]
+                            , r = unit(r[j], 'snpc')
+                            , width = 1/m, height = 1/n, gp = gp)
+        })
+        invisible()
+    }
+    # circles
+    radius_base <- min(1/n, 1/m)/2 
+    radius <- radius_base / abs(c(min(color_scale), max(color_scale)))
+    radius <- c(radius[1], 0, radius[2])
+    draw_cell.circle <- function(i, gp){
+        grid.circle(x = x[i], y = y, r = radius[sign(matrix[,i]) + 2] * abs(matrix[,i]), gp = gp)
+    }
+    #
+    draw_cell <- get(paste0('draw_cell.', type), mode = 'function', inherits = FALSE)
+    ## 
+    
     # substitute NA values with empty strings
     if( !is.null(txt) ) txt[is.na(txt)] <- ''
      
     for(i in 1:m){
-		grid.rect(x = x[i], y = y, width = 1/m, height = 1/n, gp = gpar(fill = matrix[,i], col = border_color))
+        rgp <- c_gpar(list(fill = color_matrix[,i]), border_color)
+        draw_cell(i, gp = rgp)
         if( !is.null(txt) ){
             grid.text(label=txt[, i],
                                 x=x[i],
@@ -336,9 +373,11 @@ draw_legend = function(color, breaks, legend, gp = gpar(), opts = NULL, dims.onl
     thickness <- unit(10, 'bigpts')
     space <- unit(2, 'bigpts')
     
+    legend_txt <- as.character(names(legend) %||% legend)
+    
     if( dims.only ){
-    	longest_break = which.max(nchar(as.character(legend)))
-    	longest_break = unit(1.1, "grobwidth", textGrob(as.character(legend)[longest_break], gp = gp))
+    	longest_break = which.max(nchar(legend_txt))
+    	longest_break = unit(1.1, "grobwidth", textGrob(legend_txt[longest_break], gp = gp))
     	# minimum fixed width: plan for 2 decimals and a sign 
     	min_lw = unit(1.1, "grobwidth", textGrob("-00.00", gp = gp))
     	longest_break = min(longest_break, min_lw)
@@ -376,13 +415,21 @@ draw_legend = function(color, breaks, legend, gp = gpar(), opts = NULL, dims.onl
     }
     
     if( !isTRUE(opts$horizontal) ){
-    	grid.rect(x = flip_coord(padding, opts$flip$h, unit(1, 'npc') - thickness), y = breaks[-length(breaks)], width = thickness, height = h, hjust = 0, vjust = 0
+        x.scale <- unit(opts$flip$h+0, 'npc')
+    	grid.rect(x = x.scale, y = breaks[-length(breaks)], width = thickness, height = h
+                , hjust = opts$flip$h + 0, vjust = 0
                 , gp = gpar(fill = color, col = "#FFFFFF00"))
-        grid.text(legend, x = flip_coord(txt_shift, opts$flip$h, txt_shift), y = tick_pos, hjust = 0, gp = gp)
+        grid.text(legend_txt, x = flip_coord(txt_shift, opts$flip$h, x.scale), y = tick_pos
+                            , hjust = opts$flip$h + 0
+                            , gp = gp)
     }else{
-        grid.rect(y = flip_coord(padding, !opts$flip$v), x = breaks[-length(breaks)], height = thickness, width = h, hjust = 0, vjust = 0
+        y.scale <- unit(!opts$flip$v+0, 'npc')
+        grid.rect(y = y.scale, x = breaks[-length(breaks)], height = thickness, width = h
+                , hjust = 0, vjust = !opts$flip$v
                 , gp = gpar(fill = color, col = "#FFFFFF00"))
-        grid.text(legend, y = flip_coord(txt_shift, !opts$flip$v), x = tick_pos, vjust = 0, gp = gp)
+        grid.text(legend_txt, y = flip_coord(txt_shift, !opts$flip$v, y.scale), x = tick_pos
+                            , hjust = 0.5, vjust = !opts$flip$v + 0
+                            , gp = gp)
     }
 }
 
@@ -430,15 +477,15 @@ draw_annotations = function(converted_annotations, border_color, horizontal=TRUE
 		x = (1:m)/m - 1/2/m
 		y = cumsum(rep(size + 2, n)) - cex * base_size / 2
 		for(i in 1:m){
-			grid.rect(x = x[i], unit(y[n:1], "bigpts"), width = 1/m, height = psize, gp = gpar(fill = converted_annotations[i, ], col = border_color))
+			grid.rect(x = x[i], unit(y[n:1], "bigpts"), width = 1/m, height = psize
+                    , gp = c_gpar(list(fill = converted_annotations[i, ]), border_color))
 		}
 	}else{
 		x = cumsum(rep(size + 2, n)) - cex * base_size / 2
 		y = (1:m)/m - 1/2/m
 		for (i in 1:m) {
 			grid.rect(x = unit(x[1:n], "bigpts"), y=y[i], width = psize, 
-					height = 1/m, gp = gpar(fill = converted_annotations[i,]
-					, col = border_color))
+					height = 1/m, gp = c_gpar(list(fill = converted_annotations[i,]), border_color))
 		}
 	}
 }
@@ -455,7 +502,8 @@ draw_annotation_legend = function(annotation_colors, border_color, gp = gpar()){
 		acol <- annotation_colors[[i]]
 		if( attr(acol, 'afactor') ){
 			sapply(seq_along(acol), function(j){
-				grid.rect(x = unit(0, "npc"), y = y, hjust = 0, vjust = 1, height = text_height, width = text_height, gp = gpar(col = border_color, fill = acol[j]))
+				grid.rect(x = unit(0, "npc"), y = y, hjust = 0, vjust = 1, height = text_height, width = text_height
+                            , gp = c_gpar(list(fill = acol[j]), border_color))
 				grid.text(names(acol)[j], x = text_height * 1.3, y = y, hjust = 0, vjust = 1, gp = gp)
 				y <<- y - 1.5 * text_height
 			})
@@ -755,6 +803,7 @@ aheatmap_layout <- function(layout = 'daml', size = NULL){
         if( cex.pad[1] ) wunits <- padd(wunits, cex.pad[1] * padding)
         if( cex.pad[1] ) hunits <- padd(hunits, cex.pad[2] * padding)
         
+#        print(hunits)
         lo <- grid.layout(nrow = length(hunits), ncol = length(wunits)
 	            , widths = do.call('unit.c', wunits)
 	            , heights = do.call('unit.c', hunits))
@@ -923,6 +972,13 @@ d <- function(x){
 	invisible(basename(tempfile()))
 }
 
+border_gpar <- function(x, as.list = FALSE){
+    gp <- if( is.list(x) ) x else list(col = x)
+    if( !as.list ) do.call(gpar,gp) else gp
+}
+
+border_gpar_list <- function(...) border_gpar(..., as.list = TRUE)
+
 heatmap_motor = function(matrix, border_color, cellwidth, cellheight
 	, tree_col, tree_row, treeheight_col, treeheight_row
 	, filename=NA, width=NA, height=NA
@@ -1039,10 +1095,22 @@ heatmap_motor = function(matrix, border_color, cellwidth, cellheight
 	}
 
 	#grid.show.layout(glo$layout); return()
-	mindim <- glo$mindim
-	# Omit border color if cell size is too small 
-	if(mindim < 3) border_color = NA
-
+	
+    # load border specifications
+    border_color <- if( !is.list(border_color) ) list(base = border_color) else border_color 
+	for( b in c('base', 'cell', 'matrix', 'annRow', 'annCol', 'annLeg') ){
+        val <- border_color[[b]] %||% border_color[['base']] %||% NA
+        border_color[[b]] <- border_gpar_list(val) 
+    }
+    #
+    
+    # Omit border color if cell size is too small
+    mindim <- glo$mindim
+    if(mindim < 3 && !is_NA(border_color$cell$col) ){
+        warning("Forcing no-border on cells due to their small dimensions.")
+        border_color$cell <- list(col=NA)
+    }
+    
 	# Draw tree for the columns
 	if (!is_NA(tree_col) &&  treeheight_col != 0 && vplayout('ctree') ){
 		draw_dendrogram(tree_col, horizontal = FALSE, flip = loptions$dendrogram$flip$v)
@@ -1061,63 +1129,77 @@ heatmap_motor = function(matrix, border_color, cellwidth, cellheight
     
 	# Draw matrix
 	if( vplayout('mat') ){
-    	draw_matrix(matrix, border_color, txt = txt, gp = gpar(fontsize = fontsize_row))
+    	draw_matrix(matrix, border_color$cell
+                            , txt = txt, gp = gpar(fontsize = fontsize_row))
     	#d(matrix)
-    	#grid.rect()
+        # outer border
+        if( !is_NA(border_color$matrix$col) ){
+            grid.rect(gp = border_gpar(border_color$matrix))
+        }
+        trace_vp()
     	upViewport()
     }
 
 	# Draw colnames
 	if(length(colnames(matrix)) != 0 && vplayout('cnam') ){
 		draw_colnames(colnames(matrix), gp = c_gpar(gp, fontsize = fontsize_col))
+        trace_vp()
 		upViewport()
 	}
 	
 	# Draw rownames
 	if(length(rownames(matrix)) != 0 && vplayout('rnam') ){
 		draw_rownames(rownames(matrix), gp = c_gpar(gp, fontsize = fontsize_row))
+        trace_vp()
 		upViewport()
 	}
 
 	# Draw annotation tracks
 	if( !is_NA(annotation) && vplayout('cann') ){
-		draw_annotations(annotation, border_color, cex = cexAnn[2L])
+		draw_annotations(annotation, border_color$annCol, cex = cexAnn[2L])
+        trace_vp()
 		upViewport()
 	}	
 	
 	# add row annotations if necessary	
 	if ( !is_NA(row_annotation) && vplayout('rann') ) {
-		draw_annotations(row_annotation, border_color, horizontal=FALSE, cex = cexAnn[1L])
+		draw_annotations(row_annotation, border_color$annRow, horizontal=FALSE, cex = cexAnn[1L])
+        trace_vp()
 		upViewport()
 	}
 	
 	# Draw annotation legend
 	if( annotation_legend && !is_NA(annotation_colors) && vplayout('aleg') ){
-		draw_annotation_legend(annotation_colors, border_color, gp = c_gpar(gp, fontsize = fontsize))
+		draw_annotation_legend(annotation_colors, border_color$annLeg, gp = c_gpar(gp, fontsize = fontsize))
+        trace_vp()
 		upViewport()
 	}
 
 	# Draw legend
 	if(!is_NA(legend) && vplayout('leg') ){
 		draw_legend(color, breaks, legend, gp = c_gpar(gp, fontsize = fontsize), opts = loptions$legend)
+        trace_vp()
 		upViewport()
 	}
 
 	# Draw main title
 	if(!is.null(mainGrob) && vplayout('main') ){
 		grid.draw(mainGrob)
+        trace_vp()
 		upViewport()
 	}
 	
 	# Draw subtitle
 	if(!is.null(subGrob) && vplayout('sub') ){
 		grid.draw(subGrob)
+        trace_vp()
 		upViewport()
 	}
 	
 	# Draw info
 	if(!is.null(infoGrob) && vplayout('info') ){
 		grid.draw(infoGrob)
+        trace_vp()
 		upViewport()
 	}
 		
@@ -1421,7 +1503,7 @@ cluster_mat = function(mat, param, distfun, hclustfun, reorderfun, na.rm=TRUE, s
             if(distfun == "correlation") distfun <- 'pearson'
 			if(distfun %in% corr.methods){ # distance from correlation matrix 
                 if( verbose ) message("Using distance method: correlation (", distfun, ')')
-                d <- dist(1 - cor(t(mat), method = distfun))
+                d <- as.dist(1 - cor(t(mat), method = distfun))
                 attr(d, 'method') <- distfun
                 d 
             }else{
@@ -1480,7 +1562,7 @@ scale_mat = function(x, scale, na.rm=TRUE){
 	av <- c("none", "row", "column", 'r1', 'c1')
 	i <- pmatch(scale, av)	
 	if( is_NA(i) )
-		stop("scale argument shoud take values: 'none', 'row' or 'column'")
+		stop("scale argument shoud take values: ", str_out(av, Inf))
 	scale <- av[i]
 		
 	switch(scale, none = x
@@ -1840,6 +1922,17 @@ subset_index <- function(x, margin, subset){
 	sort(subIdx)
 }
 
+trace_vp <- local({.on <- FALSE
+    function(on){
+        if( !missing(on) ){
+            old <- .on
+            .on <<- on
+            return(old)
+        }
+        if( .on ) grid.rect(gp = gpar(col = "blue", lwd = 2))
+    }
+})
+
 #' Annotated Heatmaps
 #' 
 #' The function \code{aheatmap} plots high-quality heatmaps, with a detailed legend 
@@ -1905,12 +1998,13 @@ subset_index <- function(x, margin, subset){
 #' 
 #' @param breaks a sequence of numbers that covers the range of values in \code{x} and is one 
 #' element longer than color vector. Used for mapping values to colors. Useful, if needed 
-#' to map certain values to certain colors. If value is NA then the 
+#' to map certain values to certain colors. If NA then the 
 #' breaks are calculated automatically. If \code{breaks} is a single value, 
-#' then the colour palette is centered on this value. 
+#' then the colour palette is forced to be centered on this value. 
 #' 
 #' @param border_color color of cell borders on heatmap, use NA if no border should be 
 #' drawn.
+#' This argument allows for a finer control of borders (see dedicated demos and vignettes).
 #' 
 #' @param cellwidth individual cell width in points. If left as NA, then the values 
 #' depend on the size of plotting window.
@@ -2094,6 +2188,8 @@ subset_index <- function(x, margin, subset){
 #' @param verbose if \code{TRUE} then verbose messages are displayed and the 
 #' borders of some viewports are highlighted. It is entended for debugging 
 #' purposes.
+#' @param trace logical that indicates if the different grid viewports should be 
+#' traced with a blue border (debugging purpose).
 #' 
 #' @param gp graphical parameters for the text used in plot. Parameters passed to 
 #' \code{\link{grid.text}}, see \code{\link{gpar}}. 
@@ -2254,9 +2350,19 @@ subset_index <- function(x, margin, subset){
 #' t.na[sample(length(t.na), 500)] <- NA # half of the cells
 #' aheatmap(x, txt = t.na)
 #' 
+#' # Borders
+#' # all
+#' aheatmap(x, annCol = annotation, border = TRUE)
+#' # around data matrix
+#' aheatmap(x, annCol = annotation, border = list(matrix = TRUE))
+#' # around cells only
+#' aheatmap(x, annCol = annotation, border = list(cell = TRUE))
+#' # finer control
+#' aheatmap(x, annCol = annotation, border = list(matrix = list(col = 'blue', lwd=2), annCol = 'green', annLeg = 'grey'))
+#' 
 #' @export
 aheatmap = function(x
-, color = '-RdYlBu2:100', na.color = NA
+, color = '-RdYlBu2:100', type = c('rect', 'circle', 'roundrect'), na.color = NA
 , breaks = NA, border_color=NA, cellwidth = NA, cellheight = NA, scale = "none"
 , Rowv=TRUE, Colv=TRUE
 , revC = identical(Colv, "Rowv") || is_NA(Rowv) || (is.integer(Rowv) && length(Rowv) > 1)
@@ -2270,18 +2376,26 @@ aheatmap = function(x
 , fontsize=10, cexRow = min(0.2 + 1/log10(nr), 1.2), cexCol = min(0.2 + 1/log10(nc), 1.2)
 , filename = NA, width = NA, height = NA
 , main = NULL, sub = NULL, info = NULL
-, verbose=getOption('verbose'), gp = gpar()){
+, verbose=getOption('verbose'), trace = verbose > 1, gp = gpar()){
 
 	# set verbosity level
 	ol <- lverbose(verbose)
-	on.exit( lverbose(ol) )
+    trace_vp(trace)
+	on.exit( {lverbose(ol); trace_vp(FALSE)} )
 	
 	# convert ExpressionSet into 
+    vLEVELs <- NULL
 	if( is(x, 'ExpressionSet') ){
 		library(Biobase)
 		if( isTRUE(annCol) ) annCol <- atrack(x)
 		x <- Biobase::exprs(x)
-	}
+        
+	}else if( is.character(x) ){ # switch to integer matrix
+        fx <- factor(x)
+        x <- matrix(as.integer(fx), nrow(x))
+        vLEVELs <- levels(fx)
+        rm(fx)
+    } 
 
 	# rename to old parameter name
 	mat <- x
@@ -2477,14 +2591,41 @@ aheatmap = function(x
 	
 	# Preprocess matrix
 	if( verbose ) message("Scale matrix")
-	mat = as.matrix(mat)
-	mat = scale_mat(mat, scale)
+    isINT <- is.integer(mat)
+	if( !is.matrix(mat) ) mat <- as.matrix(mat)
 	
 	## Colors and scales
     # generate colour scale
     if( verbose ) message("Generate colour scale (palette + breaks)")
     if( is_NA(breaks) ) breaks <- NULL
-	colour_scale <- ccRamp(color, breaks = breaks, data = as.vector(mat))
+    if( isINT ){
+        if( !is_NA(scale) && is.na(pmatch(scale, 'none')) )
+            warning("Input matirx is an integer matrix: discarding argument `scale`.")
+        if( !is.null(breaks) ) colour_scale <- ccRamp(color, breaks = breaks, data = as.vector(mat))
+        else{
+            colour_scale <- sort(unique(as.vector(mat)))
+            if( isTRUE(legend) ){
+                legend <- setNames(unname(colour_scale), names(color)[seq_along(colour_scale)])
+                
+            }else if( is.character(legend) ) 
+                legend <- setNames(unname(colour_scale), legend[seq_along(colour_scale)])
+            # use levels for legend if necessary
+            if( !is.null(vLEVELs) && is.null(names(legend)) )
+                names(legend) <- vLEVELs 
+                        
+            colour_scale <- ccRamp(color, n = length(colour_scale), breaks = c(colour_scale-0.5, max(colour_scale) + .5), data = as.vector(mat))             
+        }
+    }else{
+        mat = scale_mat(mat, scale)
+        colour_scale <- ccRamp(color, breaks = breaks, data = as.vector(mat))
+    }
+    
+#    # fix infinite breaks
+#    m_range <- range(mat, na.rm = TRUE)
+#    b_range <- range(colour_scale[is.finite(colour_scale)], na.rm = TRUE)
+#    colour_scale[colour_scale == -Inf] <- min(m_range[1], b_range[1]) - .001
+#    colour_scale[colour_scale == Inf] <- max(m_range[2], b_range[2]) + .001
+    
     # store into result list
     res$col <- colour_scale
     # assign as separate objects (legacy)
@@ -2493,9 +2634,8 @@ aheatmap = function(x
         
     if( isTRUE(legend) ){
 		if( verbose ) message("Generate colour scale ticks")
-		legend = grid.pretty(range(as.vector(breaks)))
-	}
-	else {
+		legend = grid.pretty(range(as.vector(breaks), na.rm = TRUE))
+	}else if( !is.numeric(legend) ){
 		legend = NA
 	}
     
@@ -2506,15 +2646,17 @@ aheatmap = function(x
         if( length(na_range) == 1L ) mat[mat %in% na_range] <- NA
         else mat[mat >= na_range[1L] & mat <= na_range[2L] ] <- NA
     }
-    mat = scale_colours(mat, col = color, breaks = breaks)
+    
+    if( isINT ){ 
+        color_mat <- matrix(color[as.numeric(factor(mat))], nrow(mat), dimnames = dimnames(mat))
+    }else color_mat <- scale_colours(mat, col = color, breaks = breaks)
+
     if( !is_NA(na.color) ){ # use specified color for NA values
-        mat[is.na(mat)] <- na.color[[1L]]
+        color_mat[is.na(color_mat)] <- na.color[[1L]]
     }
     
-	annotation_legend <- annLegend
-	annotation_colors <- annColors
-	
 	# render annotation tracks for both rows and columns
+    annotation_colors <- annColors
 	annCol_processed <- atrack(annCol, order=res$colInd, .SPECIAL=specialAnnotation(2L), .DATA=amargin(x,2L), .CACHE=annRow)
 	annRow_processed <- atrack(annRow, order=res$rowInd, .SPECIAL=specialAnnotation(1L), .DATA=amargin(x,1L), .CACHE=annCol)
 	specialAnnotation(clear=TRUE)
@@ -2522,9 +2664,29 @@ aheatmap = function(x
 								, annotation_colors = annotation_colors
 								, verbose=verbose)
 	#
+
+    ## Annotation legend
+    # handle specific on/off annotation legend
+    if( isString(annLegend) ){
+        annLegend <- match.arg(annLegend, c('row', 'column', 'both', 'none'))
+        annLegend <- (c('row', 'column') %in% annLegend | annLegend == 'both') & annLegend != 'none' 
+    }
+    if( is.logical(annLegend) ) annLegend <- rep(annLegend, length.out = 2L)
+    # disable annotation legends as requested
+    if( !annLegend[1L] ) annTracks$colors <- annTracks$colors[colnames(annTracks$annCol)]
+    if( !annLegend[2L] ) annTracks$colors <- annTracks$colors[colnames(annTracks$annRow)]
+    annotation_legend <- any(annLegend)
+    ##
+
 	
-	# retrieve dimension for computing cexRow and cexCol (evaluated from the arguments)
-	nr <- nrow(mat); nc <- ncol(mat)
+	# attach colors, shape, scale to data matrix 
+	class(mat) <- c(paste0(type, "_matrix"), "shaped_matrix")
+    attr(mat, 'type') <- match.arg(type)
+    attr(mat, 'color') <- color_mat
+    attr(mat, 'scale') <- colour_scale  
+    
+    # retrieve dimension for computing cexRow and cexCol (evaluated from the arguments)
+    nr <- nrow(mat); nc <- ncol(mat)
 	# Draw heatmap	
 	res$vp <- heatmap_motor(mat, border_color = border_color, cellwidth = cellwidth, cellheight = cellheight
 	, treeheight_col = treeheight_col, treeheight_row = treeheight_row, tree_col = tree_col, tree_row = tree_row
